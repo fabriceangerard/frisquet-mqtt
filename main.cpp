@@ -9,14 +9,30 @@
 SX1262 radio = new Module(SS, DIO0, RST_LoRa, BUSY_LoRa); 
 
 // Configuration Wifi
-const char* ssid = "ssid wifi";  // Mettre votre SSID Wifi
-const char* password = "wifi password";  // Mettre votre mot de passe Wifi
+const char* ssid = "";  // Mettre votre SSID Wifi
+const char* password = "";  // Mettre votre mot de passe Wifi
 
 // Définition de l'adresse du broket MQTT
-const char* mqttServer = "192.168.XXX.XXX"; // Mettre l'ip du serveur mqtt
+const char* mqttServer = ""; // Mettre l'ip du serveur mqtt
 const int mqttPort = 1883;
-const char* mqttUsername = "mqttUsername"; // Mettre le user mqtt
-const char* mqttPassword = "mqttPassword"; // Mettre votre mot de passe mqtt
+const char* mqttUsername = ""; // Mettre le user mqtt
+const char* mqttPassword = ""; // Mettre votre mot de passe mqtt
+
+// FA: Définition du compteur pour requêter la chaudière
+int b;  // Boiler counter
+
+// FA: Variables communes
+// -- variables à utiliser plus tard
+byte fromID = 0x80; // 01 - 80 (boiler)
+byte toID = 0x08;   // 02 - 08 (satellite)
+byte reqID = 0xCA;  // 03 - CA
+byte msgNum = 0x95; // 04 - 95
+byte DemRep = 0x01; // 05 - 01 Demande ou 81 Réponse
+byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
+uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network id de la chaudiere
+
+// -- Première initialisation de la chaîne de requête a la chaudière
+uint8_t BoilerTx[] = {fromID, toID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -34,12 +50,14 @@ void connectToMqtt() {
       }
   }
 }
+
 void connectToTopic() {
-  // Configuration du capteur de température
+
+// Configuration du capteur de température
 char temperatureConfigTopic[] = "homeassistant/sensor/frisquet_temperature/config";
 char temperatureConfigPayload[] = R"(
 {
-  "name": "Maison Temperature interieur",
+  "name": "Frisquet - Temperature interieur",
   "state_topic": "homeassistant/sensor/frisquet_temperature/state",
   "unit_of_measurement": "°C",
   "device_class": "temperature"
@@ -51,7 +69,7 @@ client.publish(temperatureConfigTopic, temperatureConfigPayload);
 char tempconsigneConfigTopic[] = "homeassistant/sensor/frisquet_consigne/config";
 char tempconsigneConfigPayload[] = R"(
 {
-  "name": "Maison Temperature consigne",
+  "name": "Frisquet - Temperature consigne",
   "state_topic": "homeassistant/sensor/frisquet_consigne/state",
   "unit_of_measurement": "°C",
   "device_class": "temperature"
@@ -63,14 +81,59 @@ client.publish(tempconsigneConfigTopic, tempconsigneConfigPayload);
 char payloadConfigTopic[] = "homeassistant/sensor/frisquet_payload/config";
 char payloadConfigPayload[] = R"(
 {
-  "name": "Payload frisquet",
+  "name": "Frisquet - Payload",
   "state_topic": "homeassistant/sensor/frisquet_payload/state"
 }
 )";
 client.publish(payloadConfigTopic, payloadConfigPayload);
+
+// FA: Configuration du capteur CDC
+char tempCDCConfigTopic[] = "homeassistant/sensor/frisquet_CDC/config";
+char tempCDCConfigPayload[] = R"(
+{
+  "name": "Frisquet - Temperature CDC",
+  "state_topic": "homeassistant/sensor/frisquet_CDC/state",
+  "unit_of_measurement": "°C",
+  "device_class": "temperature"
+}
+)";
+client.publish(tempCDCConfigTopic, tempCDCConfigPayload);
+
+// FA: Configuration du capteur ECS
+char tempECSConfigTopic[] = "homeassistant/sensor/frisquet_ECS/config";
+char tempECSConfigPayload[] = R"(
+{
+  "name": "Frisquet - Temperature ECS",
+  "state_topic": "homeassistant/sensor/frisquet_ECS/state",
+  "unit_of_measurement": "°C",
+  "device_class": "temperature"
+}
+)";
+client.publish(tempECSConfigTopic, tempECSConfigPayload);
+
+// FA: Configuration du capteur Depart
+char tempDepartConfigTopic[] = "homeassistant/sensor/frisquet_Depart/config";
+char tempDepartConfigPayload[] = R"(
+{
+  "name": "Frisquet - Temperature Depart",
+  "state_topic": "homeassistant/sensor/frisquet_Depart/state",
+  "unit_of_measurement": "°C",
+  "device_class": "temperature"
+}
+)";
+client.publish(tempDepartConfigTopic, tempDepartConfigPayload);
+
 }
 
 void initOTA();
+
+// FA: Demande de températures à la chaudière 
+void requestBoiler(){
+  Serial.printf("-- Appel Request Boiler ");
+  int stateTx = radio.transmit(BoilerTx, 10);
+  Serial.printf("- Transmit status : ");
+  Serial.println(stateTx);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -82,14 +145,14 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
-    
+  
   int state = radio.beginFSK();
   state = radio.setFrequency(868.96);
   state = radio.setBitRate(25.0);
   state = radio.setFrequencyDeviation(50.0);
   state = radio.setRxBandwidth(250.0);
   state = radio.setPreambleLength(4);
-  uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network id de la chaudiere
+
   state = radio.setSyncWord(network_id, sizeof(network_id));
 
   initOTA();
@@ -101,6 +164,7 @@ void setup() {
   client.setServer(mqttServer, mqttPort);
   connectToMqtt();
   connectToTopic();
+  requestBoiler();
 }
 
 void loop() {
@@ -111,22 +175,123 @@ void loop() {
   connectToTopic();
 
   char message[255];
+  
+  // FA: Demande toutes les 500 écoutes
+  if (b == 500) { // délais avant rappel à mettre en variable
+    requestBoiler();
+    b = 0;
+  }
+  // FA: Incrément compteur 
+    b++;
+  
   byte byteArr[RADIOLIB_SX126X_MAX_PACKET_LENGTH];
   int state = radio.receive(byteArr, 0);
+  
   if (state == RADIOLIB_ERR_NONE) {
     int len = radio.getPacketLength();
     Serial.printf("RECEIVED [%2d] : ", len);
     message[0] = '\0';
+    for (int i = 0; i < len; i++) {
+      sprintf(message + strlen(message), "%02X ", byteArr[i]);
+      Serial.printf("%02X ", byteArr[i]);}
+      if (!client.publish("homeassistant/sensor/frisquet_payload/state", message)) {
+        Serial.println("Failed to publish Payload to MQTT");
+    }
+    Serial.println("");
+
+    // FA: Décodage chaîne de réponse suite à demande de températures
+    if (len == 63) {
+      Serial.println("- Trame chaudière reçue");
+      
+      // Extract bytes 9 and 9
+      int decimalValueECS = byteArr[7] << 8 | byteArr[8];
+      float ECSValue = decimalValueECS / 10.0;
+      Serial.printf("Temperature ECS : "); Serial.println(ECSValue);
+     
+      // Extract bytes 10 and 11 - CDC
+      int decimalValueCDC = byteArr[9] << 8 | byteArr[10];
+      float CDCValue = decimalValueCDC / 10.0;
+      Serial.printf("Temperature CDC : "); Serial.println(CDCValue);
+
+      // Extract bytes 12 and 13
+      int decimalValueDepart = byteArr[11] << 8 | byteArr[12];
+      float DepartValue = decimalValueDepart / 10.0;
+      Serial.printf("Temperature Depart : "); Serial.println(DepartValue);
+
+      // Publish temperature to the "frisquet_CDC" MQTT topic
+      char CDCTopic[] = "homeassistant/sensor/frisquet_CDC/state";
+      char CDCPayload[10];
+      snprintf(CDCPayload, sizeof(CDCPayload), "%.2f", CDCValue);
+      if (!client.publish(CDCTopic, CDCPayload)) {
+        Serial.println("Failed to publish temperature to MQTT");
+      }
+      
+      // Publish temperature to the "frisquet_ECS" MQTT topic
+      char ECSTopic[] = "homeassistant/sensor/frisquet_ECS/state";
+      char ECSPayload[10];
+      snprintf(ECSPayload, sizeof(ECSPayload), "%.2f", ECSValue);
+      if (!client.publish(ECSTopic, ECSPayload)) {
+        Serial.println("Failed to publish temperature to MQTT");
+      }      
+
+      // Publish temperature to the "frisquet_Depart" MQTT topic
+      char DepartTopic[] = "homeassistant/sensor/frisquet_Depart/state";
+      char DepartPayload[10];
+      snprintf(DepartPayload, sizeof(DepartPayload), "%.2f", DepartValue);
+      if (!client.publish(DepartTopic, DepartPayload)) {
+        Serial.println("Failed to publish temperature to MQTT");
+      }    
+    }
+
+    if (len == 49) {
+      Serial.println("Trame satellite reçue");
+      Serial.printf("Séquence : "); Serial.println(byteArr[5]);
+
+    }
 
     if (len == 23) {  // Check if the length is 23 bytes
+
+      Serial.println("- Trame satellite reçue");
 
       // Extract bytes 16 and 17
       int decimalValueTemp = byteArr[15] << 8 | byteArr[16];
       float temperatureValue = decimalValueTemp / 10.0;
+      Serial.printf("Temperature : "); Serial.println(temperatureValue);
 
       // Extract bytes 18 and 19
       int decimalValueCons = byteArr[17] << 8 | byteArr[18];
       float temperatureconsValue = decimalValueCons / 10.0;
+      Serial.printf("Temperature consigne : "); Serial.println(temperatureconsValue);
+
+      // Publish temperature to the "frisquet_temperature" MQTT topic
+      char temperatureTopic[] = "homeassistant/sensor/frisquet_temperature/state";
+      char temperaturePayload[10];
+      snprintf(temperaturePayload, sizeof(temperaturePayload), "%.2f", temperatureValue);
+      if (!client.publish(temperatureTopic, temperaturePayload)) {
+        Serial.println("Failed to publish temperature to MQTT");
+      }
+      
+      // Publish temperature to the "tempconsigne" MQTT topic
+      char tempconsigneTopic[] = "homeassistant/sensor/frisquet_consigne/state";
+      char tempconsignePayload[10];
+      snprintf(tempconsignePayload, sizeof(tempconsignePayload), "%.2f", temperatureconsValue);
+      if (!client.publish(tempconsigneTopic, tempconsignePayload)) {
+        Serial.println("Failed to publish consigne to MQTT");
+      }
+    }
+    if (len == 23) {  // Check if the length is 23 bytes
+
+      Serial.println(byteArr[7]);
+
+      // Extract bytes 16 and 17
+      int decimalValueTemp = byteArr[15] << 8 | byteArr[16];
+      float temperatureValue = decimalValueTemp / 10.0;
+      Serial.printf("Temperature : "); Serial.println(temperatureValue);
+
+      // Extract bytes 18 and 19
+      int decimalValueCons = byteArr[17] << 8 | byteArr[18];
+      float temperatureconsValue = decimalValueCons / 10.0;
+      Serial.printf("Temperature consigne : "); Serial.println(temperatureconsValue);
 
       // Publish temperature to the "frisquet_temperature" MQTT topic
       char temperatureTopic[] = "homeassistant/sensor/frisquet_temperature/state";
@@ -143,14 +308,7 @@ void loop() {
         Serial.println("Failed to publish consigne to MQTT");
       }
     }
-    for (int i = 0; i < len; i++) {
-      sprintf(message + strlen(message), "%02X ", byteArr[i]);
-      Serial.printf("%02X ", byteArr[i]);}
-      if (!client.publish("homeassistant/sensor/frisquet_payload/state", message)) {
-        Serial.println("Failed to publish Payload to MQTT");
-    }
-    Serial.println("");
-  }
+   }
   client.loop();
 }
 
@@ -186,4 +344,8 @@ void initOTA() {
   });
 
   ArduinoOTA.begin();
+}
+// put function definitions here:
+int myFunction(int x, int y) {
+  return x + y;
 }
