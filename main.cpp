@@ -279,35 +279,6 @@ void loop() {
         Serial.println("Failed to publish consigne to MQTT");
       }
     }
-    if (len == 23) {  // Check if the length is 23 bytes
-
-      Serial.println(byteArr[7]);
-
-      // Extract bytes 16 and 17
-      int decimalValueTemp = byteArr[15] << 8 | byteArr[16];
-      float temperatureValue = decimalValueTemp / 10.0;
-      Serial.printf("Temperature : "); Serial.println(temperatureValue);
-
-      // Extract bytes 18 and 19
-      int decimalValueCons = byteArr[17] << 8 | byteArr[18];
-      float temperatureconsValue = decimalValueCons / 10.0;
-      Serial.printf("Temperature consigne : "); Serial.println(temperatureconsValue);
-
-      // Publish temperature to the "frisquet_temperature" MQTT topic
-      char temperatureTopic[] = "homeassistant/sensor/frisquet_temperature/state";
-      char temperaturePayload[10];
-      snprintf(temperaturePayload, sizeof(temperaturePayload), "%.2f", temperatureValue);
-      if (!client.publish(temperatureTopic, temperaturePayload)) {
-        Serial.println("Failed to publish temperature to MQTT");
-      }
-      // Publish temperature to the "frisquet_consigne" MQTT topic
-      char tempconsigneTopic[] = "homeassistant/sensor/frisquet_consigne/state";
-      char tempconsignePayload[10];
-      snprintf(tempconsignePayload, sizeof(tempconsignePayload), "%.2f", temperatureconsValue);
-      if (!client.publish(tempconsigneTopic, tempconsignePayload)) {
-        Serial.println("Failed to publish consigne to MQTT");
-      }
-    }
    }
   client.loop();
 }
