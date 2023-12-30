@@ -51,82 +51,80 @@ void connectToMqtt() {
       Serial.print(client.state());
       Serial.println(" Retrying in 5 seconds...");
       delay(5000);
-      }
+    }
   }
 }
 
 void connectToTopic() {
-
-// Configuration du capteur de température
-char temperatureConfigTopic[] = "homeassistant/sensor/frisquet_temperature/config";
-char temperatureConfigPayload[] = R"(
-{
-  "name": "Frisquet - Temperature interieur",
-  "state_topic": "homeassistant/sensor/frisquet_temperature/state",
-  "unit_of_measurement": "°C",
-  "device_class": "temperature"
-}
-)";
-client.publish(temperatureConfigTopic, temperatureConfigPayload);
-
-  // Configuration du capteur de température de consigne
-char tempconsigneConfigTopic[] = "homeassistant/sensor/frisquet_consigne/config";
-char tempconsigneConfigPayload[] = R"(
-{
-  "name": "Frisquet - Temperature consigne",
-  "state_topic": "homeassistant/sensor/frisquet_consigne/state",
-  "unit_of_measurement": "°C",
-  "device_class": "temperature"
-}
-)";
-client.publish(tempconsigneConfigTopic, tempconsigneConfigPayload);
-
-// Configuration récupération Payload
-char payloadConfigTopic[] = "homeassistant/sensor/frisquet_payload/config";
-char payloadConfigPayload[] = R"(
-{
-  "name": "Frisquet - Payload",
-  "state_topic": "homeassistant/sensor/frisquet_payload/state"
-}
-)";
-client.publish(payloadConfigTopic, payloadConfigPayload);
-
-// FA: Configuration du capteur CDC
-char tempCDCConfigTopic[] = "homeassistant/sensor/frisquet_CDC/config";
-char tempCDCConfigPayload[] = R"(
-{
-  "name": "Frisquet - Temperature CDC",
-  "state_topic": "homeassistant/sensor/frisquet_CDC/state",
-  "unit_of_measurement": "°C",
-  "device_class": "temperature"
-}
-)";
-client.publish(tempCDCConfigTopic, tempCDCConfigPayload);
-
-// FA: Configuration du capteur ECS
-char tempECSConfigTopic[] = "homeassistant/sensor/frisquet_ECS/config";
-char tempECSConfigPayload[] = R"(
-{
-  "name": "Frisquet - Temperature ECS",
-  "state_topic": "homeassistant/sensor/frisquet_ECS/state",
-  "unit_of_measurement": "°C",
-  "device_class": "temperature"
-}
-)";
-client.publish(tempECSConfigTopic, tempECSConfigPayload);
-
-// FA: Configuration du capteur Depart
-char tempDepartConfigTopic[] = "homeassistant/sensor/frisquet_Depart/config";
-char tempDepartConfigPayload[] = R"(
-{
-  "name": "Frisquet - Temperature Depart",
-  "state_topic": "homeassistant/sensor/frisquet_Depart/state",
-  "unit_of_measurement": "°C",
-  "device_class": "temperature"
-}
-)";
-client.publish(tempDepartConfigTopic, tempDepartConfigPayload);
-
+  // Configuration du capteur de température
+  char temperatureConfigTopic[] = "homeassistant/sensor/frisquet_temperature/config";
+  char temperatureConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Temperature interieur",
+    "state_topic": "homeassistant/sensor/frisquet_temperature/state",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature"
+  }
+  )";
+  client.publish(temperatureConfigTopic, temperatureConfigPayload);
+  
+    // Configuration du capteur de température de consigne
+  char tempconsigneConfigTopic[] = "homeassistant/sensor/frisquet_consigne/config";
+  char tempconsigneConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Temperature consigne",
+    "state_topic": "homeassistant/sensor/frisquet_consigne/state",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature"
+  }
+  )";
+  client.publish(tempconsigneConfigTopic, tempconsigneConfigPayload);
+  
+  // Configuration récupération Payload
+  char payloadConfigTopic[] = "homeassistant/sensor/frisquet_payload/config";
+  char payloadConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Payload",
+    "state_topic": "homeassistant/sensor/frisquet_payload/state"
+  }
+  )";
+  client.publish(payloadConfigTopic, payloadConfigPayload);
+  
+  // FA: Configuration du capteur CDC
+  char tempCDCConfigTopic[] = "homeassistant/sensor/frisquet_CDC/config";
+  char tempCDCConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Temperature CDC",
+    "state_topic": "homeassistant/sensor/frisquet_CDC/state",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature"
+  }
+  )";
+  client.publish(tempCDCConfigTopic, tempCDCConfigPayload);
+  
+  // FA: Configuration du capteur ECS
+  char tempECSConfigTopic[] = "homeassistant/sensor/frisquet_ECS/config";
+  char tempECSConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Temperature ECS",
+    "state_topic": "homeassistant/sensor/frisquet_ECS/state",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature"
+  }
+  )";
+  client.publish(tempECSConfigTopic, tempECSConfigPayload);
+  
+  // FA: Configuration du capteur Depart
+  char tempDepartConfigTopic[] = "homeassistant/sensor/frisquet_Depart/config";
+  char tempDepartConfigPayload[] = R"(
+  {
+    "name": "Frisquet - Temperature Depart",
+    "state_topic": "homeassistant/sensor/frisquet_Depart/state",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature"
+  }
+  )";
+  client.publish(tempDepartConfigTopic, tempDepartConfigPayload);
 }
 
 void initOTA();
@@ -196,7 +194,7 @@ void loop() {
     b = 0;
   }
   // FA: Incrément compteur 
-    b++;
+  b++;
   
   byte byteArr[RADIOLIB_SX126X_MAX_PACKET_LENGTH];
   int state = radio.receive(byteArr, 0);
@@ -207,9 +205,11 @@ void loop() {
     message[0] = '\0';
     for (int i = 0; i < len; i++) {
       sprintf(message + strlen(message), "%02X ", byteArr[i]);
-      Serial.printf("%02X ", byteArr[i]);}
-      if (!client.publish("homeassistant/sensor/frisquet_payload/state", message)) {
-        Serial.println("Failed to publish Payload to MQTT");
+      Serial.printf("%02X ", byteArr[i]);
+    }
+    
+    if (!client.publish("homeassistant/sensor/frisquet_payload/state", message)) {
+      Serial.println("Failed to publish Payload to MQTT");
     }
     Serial.println("");
 
@@ -240,17 +240,14 @@ void loop() {
 
       // Publish temperature to the "frisquet_Depart" MQTT topic
       publishToMQTT("homeassistant/sensor/frisquet_Depart/state", DepartValue);
-      
     }
 
     if (len == 49) {
       Serial.println("Trame satellite reçue");
       Serial.printf("Séquence : "); Serial.println(byteArr[5]);
-
     }
 
     if (len == 23) {  // Check if the length is 23 bytes
-
       Serial.println("- Trame satellite reçue");
 
       // Extract bytes 16 and 17
@@ -279,12 +276,11 @@ void loop() {
         Serial.println("Failed to publish consigne to MQTT");
       }
     }
-   }
+  }
   client.loop();
 }
 
 void initOTA() {
- 
   ArduinoOTA.setHostname("ESP32 Frisquetconnect");
   ArduinoOTA.setTimeout(25);  // Augmenter le délai d'attente à 25 secondes
 
@@ -316,4 +312,3 @@ void initOTA() {
 
   ArduinoOTA.begin();
 }
-
