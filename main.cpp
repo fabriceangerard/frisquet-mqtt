@@ -24,6 +24,13 @@ byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de temp�
 // -- Première initialisation de la chaîne de requête a la chaudière
 uint8_t BoilerTx[] = {toID, fromID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
 
+// Déclaration des variables de valeurs des capteurs 
+float DepartValue;
+float CDCValue;
+float ECSValue;
+float tempAmbiante1Value;
+float temperatureconsValue;
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -230,7 +237,7 @@ void loop() {
       
       // Extract bytes 9 and 9
       int decimalValueECS = byteArr[7] << 8 | byteArr[8];
-      float ECSValue = decimalValueECS / 10.0;
+      ECSValue = decimalValueECS / 10.0;
       Serial.printf("Temperature ECS : ");
 
       // Publish temperature to the "frisquet_ECS" MQTT topic
@@ -238,7 +245,7 @@ void loop() {
           
       // Extract bytes 10 and 11 - CDC
       int decimalValueCDC = byteArr[9] << 8 | byteArr[10];
-      float CDCValue = decimalValueCDC / 10.0;
+      CDCValue = decimalValueCDC / 10.0;
       Serial.printf("Temperature CDC : ");
      
       // Publish temperature to the "frisquet_CDC" MQTT topic
@@ -246,12 +253,15 @@ void loop() {
       
       // Extract bytes 12 and 13
       int decimalValueDepart = byteArr[11] << 8 | byteArr[12];
-      float DepartValue = decimalValueDepart / 10.0;
+      DepartValue = decimalValueDepart / 10.0;
       Serial.printf("Temperature Depart : ");
 
       // Publish temperature to the "frisquet_Depart" MQTT topic
       publishToMQTT("homeassistant/sensor/frisquet/Depart/state", DepartValue);
       
+      Heltec.display->clear();
+      Heltec.display->drawString(0, 0, "Consigne Sat1: " + String(temperatureconsValue) + "°C");
+      Heltec.display->drawString(0, 12, "Temperature Sat1: " + String(tempAmbiante1Value) + "°C");
       Heltec.display->drawString(0, 24, "Temperature CDC: " + String(CDCValue) + "°C");
       Heltec.display->drawString(0, 36, "Temperature ECS: " + String(ECSValue) + "°C");
       Heltec.display->drawString(0, 48, "Temperature Rad: " + String(DepartValue) + "°C");
@@ -269,7 +279,7 @@ void loop() {
 
       // Extract bytes 16 and 17
       int decimalValueTemp = byteArr[15] << 8 | byteArr[16];
-      float tempAmbiante1Value = decimalValueTemp / 10.0;
+      tempAmbiante1Value = decimalValueTemp / 10.0;
       Serial.printf("Temperature : ");
 
       // Publish temperature to the "frisquet/temperature" MQTT topic
@@ -277,16 +287,19 @@ void loop() {
 
       // Extract bytes 18 and 19
       int decimalValueCons = byteArr[17] << 8 | byteArr[18];
-      float temperatureconsValue = decimalValueCons / 10.0;
+      temperatureconsValue = decimalValueCons / 10.0;
       Serial.printf("Temperature consigne : ");
 
       // Publish temperature to the "frisquet/consigne" MQTT topic
       publishToMQTT("homeassistant/sensor/frisquet/consigne/state", temperatureconsValue);
 
-      Heltec.display->drawString(0, 0, "Consigne Sat1: " + String(temperatureconsValue) + "°C");
+      Heltec.display->clear();
+      Heltec.display->drawString(0, 00, "Consigne Sat1: " + String(temperatureconsValue) + "°C");
       Heltec.display->drawString(0, 12, "Temperature Sat1: " + String(tempAmbiante1Value) + "°C");
+      Heltec.display->drawString(0, 24, "Temperature CDC: " + String(CDCValue) + "°C");
+      Heltec.display->drawString(0, 36, "Temperature ECS: " + String(ECSValue) + "°C");
+      Heltec.display->drawString(0, 48, "Temperature Rad: " + String(DepartValue) + "°C");
       Heltec.display->display();
-
     }
    }
   client.loop();
