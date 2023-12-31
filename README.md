@@ -74,8 +74,9 @@ reqID needs to be changed based on yours, retreived from the 23 bytes frame (fro
 79 uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network id de la chaudière
 
 // FA: Variables permettant d'envoyer une requête
+
 byte fromID = 0x80; // 01 - 80 (boiler)
-byte toID = 0x08;   // 02 - 08 (satellite)
+byte toID = 0x08;   // 02 - 08 (satellite) ou 7E (connect)
 byte reqID = 0xCA;  // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 en position 3
 byte msgNum = 0x96; // 04 - 96 !! Potentiellement à modifier à chaque transmission (incrémentation à mettre en place)
 byte DemRep = 0x01; // 05 - 01 Demande ou 81 Réponse
