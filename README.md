@@ -57,6 +57,7 @@ The NN part is the boiler's network ID
 # Configuration
 
 When you know your boiler's network ID, you can use the code in this repository's main.cpp file to modify the following lines :
+reqID needs to be changed based on yours, retreived from the 23 bytes frame (from the satellite), position 3
 ```bash
 11 // Configuration Wifi
 12 const char* ssid = "ssid wifi";  // Mettre votre SSID Wifi
@@ -71,4 +72,13 @@ When you know your boiler's network ID, you can use the code in this repository'
 ```
 ```bash
 79 uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network id de la chaudière
+
+// FA: Variables permettant d'envoyer une requête
+byte fromID = 0x80; // 01 - 80 (boiler)
+byte toID = 0x08;   // 02 - 08 (satellite)
+byte reqID = 0xCA;  // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 en position 3
+byte msgNum = 0x96; // 04 - 96 !! Potentiellement à modifier à chaque transmission (incrémentation à mettre en place)
+byte DemRep = 0x01; // 05 - 01 Demande ou 81 Réponse
+byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
+
 ```
