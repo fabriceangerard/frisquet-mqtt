@@ -5,37 +5,24 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <heltec.h>
+#include <config.h>
 
 SX1262 radio = new Module(SS, DIO0, RST_LoRa, BUSY_LoRa); 
-
-// Configuration Wifi
-const char* ssid = "";  // Mettre votre SSID Wifi
-const char* password = "";  // Mettre votre mot de passe Wifi
-
-// Définition de l'adresse du broket MQTT
-const char* mqttServer = ""; // Mettre l'ip du serveur mqtt
-const int mqttPort = 1883;
-
-// MQTT secrets
-const char* mqttUsername = ""; // Mettre le user mqtt
-const char* mqttPassword = ""; // Mettre votre mot de passe mqtt
-
-// NeetworkID secret
-uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network id de la chaudiere
 
 int b;  // Boiler counter
 
 // FA: Variables permettant d'envoyer une requête
-byte fromID = 0x80; // 01 - 80 (boiler)
-byte toID = 0x08;   // 02 - 08 (satellite)
+
+byte toID = 0x80; // 01 - 80 (boiler)
+byte fromID = 0x08;   // 02 - 08 (satellite) ou 7E (connect)
 byte reqID = 0xCA;  // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 
-byte msgNum = 0x96; // 04 - 96 !! Poteltiellement à modifier à chaque transmission (incémetation à mettre en place)
+byte msgNum = 0x96; // 04 - 96 !! Potentiellement à modifier à chaque transmission (incrémetation à mettre en place)
 byte DemRep = 0x01; // 05 - 01 Demande ou 81 Réponse
 byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
 
-
 // -- Première initialisation de la chaîne de requête a la chaudière
-uint8_t BoilerTx[] = {fromID, toID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
+uint8_t BoilerTx[] = {toID, fromID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -54,7 +41,7 @@ void connectToMqtt() {
   }
 }
 
-void connectToTopic() {
+void publishDeviceEntities() {
 
 // Initialisation de la connexion MQTT
 client.setServer(mqttServer, mqttPort);
@@ -173,6 +160,13 @@ void setup() {
     ESP.restart();
   }
   
+  // Initialize OLED display
+  Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
+  Heltec.display->init();
+  Heltec.display->flipScreenVertically();
+  Heltec.display->setFont(ArialMT_Plain_10);
+  Heltec.display->clear();
+
   int state = radio.beginFSK();
   state = radio.setFrequency(868.96);
   state = radio.setBitRate(25.0);
@@ -189,7 +183,7 @@ void setup() {
   // Initialisation de la connexion MQTT
   client.setServer(mqttServer, mqttPort);
   connectToMqtt();
-  connectToTopic();
+  publishDeviceEntities();
   requestBoiler();
 }
 
@@ -204,7 +198,7 @@ void loop() {
   
   // FA: Demande toutes les 500 écoutes
   if (b == 100) { // délais avant rappel à mettre en variable
-    connectToTopic();
+    publishDeviceEntities();
     requestBoiler();
     b = 0;
   }
@@ -215,7 +209,10 @@ void loop() {
   int state = radio.receive(byteArr, 0);
   
   if (state == RADIOLIB_ERR_NONE) {
-    connectToTopic(); // 
+
+    // Envoi de la configuration du device Frisquet Boiler et des ses sensors
+    publishDeviceEntities();
+    
     int len = radio.getPacketLength();
     Serial.printf("RECEIVED [%2d] : ", len);
     message[0] = '\0';
@@ -255,12 +252,15 @@ void loop() {
       // Publish temperature to the "frisquet_Depart" MQTT topic
       publishToMQTT("homeassistant/sensor/frisquet/Depart/state", DepartValue);
       
+      Heltec.display->drawString(0, 24, "Temperature CDC: " + String(CDCValue) + "°C");
+      Heltec.display->drawString(0, 36, "Temperature ECS: " + String(ECSValue) + "°C");
+      Heltec.display->drawString(0, 48, "Temperature Rad: " + String(DepartValue) + "°C");
+      Heltec.display->display();
     }
 
     if (len == 49) {
       Serial.println("Trame satellite reçue");
       Serial.printf("Séquence : "); Serial.println(byteArr[5]);
-
     }
 
     if (len == 23) {  // Check if the length is 23 bytes
@@ -282,6 +282,10 @@ void loop() {
 
       // Publish temperature to the "frisquet/consigne" MQTT topic
       publishToMQTT("homeassistant/sensor/frisquet/consigne/state", temperatureconsValue);
+
+      Heltec.display->drawString(0, 0, "Consigne Sat1: " + String(temperatureconsValue) + "°C");
+      Heltec.display->drawString(0, 12, "Temperature Sat1: " + String(tempAmbiante1Value) + "°C");
+      Heltec.display->display();
 
     }
    }
