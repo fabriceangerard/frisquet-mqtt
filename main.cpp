@@ -25,12 +25,11 @@ uint8_t network_id[] = {0xNN, 0xNN, 0xNN, 0xNN}; // remplacer NN par le network 
 
 int b;  // Boiler counter
 
-// FA: Variables communes
-// -- variables à utiliser plus tard
+// FA: Variables permettant d'envoyer une requête
 byte fromID = 0x80; // 01 - 80 (boiler)
 byte toID = 0x08;   // 02 - 08 (satellite)
-byte reqID = 0xCA;  // 03 - CA
-byte msgNum = 0x96; // 04 - 95
+byte reqID = 0xCA;  // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 
+byte msgNum = 0x96; // 04 - 96 !! Poteltiellement à modifier à chaque transmission (incémetation à mettre en place)
 byte DemRep = 0x01; // 05 - 01 Demande ou 81 Réponse
 byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
 
@@ -57,72 +56,86 @@ void connectToMqtt() {
 
 void connectToTopic() {
 
-// Configuration du capteur de température
-char temperatureConfigTopic[] = "homeassistant/sensor/frisquet_temperature/config";
-char temperatureConfigPayload[] = R"(
+// Initialisation de la connexion MQTT
+client.setServer(mqttServer, mqttPort);
+client.setBufferSize(2048);
+
+// Configuration du capteur de température ambiante 1
+char tempAmbiante1ConfigTopic[] = "homeassistant/sensor/frisquet/tempAmbiante1/config";
+char tempAmbiante1ConfigPayload[] = R"(
 {
-  "name": "Frisquet - Temperature interieur",
-  "state_topic": "homeassistant/sensor/frisquet_temperature/state",
+  "uniq_id": "frisquet_tempAmbiante1",
+  "name": "Frisquet - Temperature ambiante 1",
+  "state_topic": "homeassistant/sensor/frisquet/tempAmbiante1/state",
   "unit_of_measurement": "°C",
-  "device_class": "temperature"
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
-client.publish(temperatureConfigTopic, temperatureConfigPayload);
+client.publish(tempAmbiante1ConfigTopic, tempAmbiante1ConfigPayload);
 
   // Configuration du capteur de température de consigne
-char tempconsigneConfigTopic[] = "homeassistant/sensor/frisquet_consigne/config";
+char tempconsigneConfigTopic[] = "homeassistant/sensor/frisquet/consigne/config";
 char tempconsigneConfigPayload[] = R"(
 {
+  "uniq_id": "frisquet_tempConsigne",
   "name": "Frisquet - Temperature consigne",
-  "state_topic": "homeassistant/sensor/frisquet_consigne/state",
+  "state_topic": "homeassistant/sensor/frisquet/consigne/state",
   "unit_of_measurement": "°C",
-  "device_class": "temperature"
+  "device_class": "temperature",
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
 client.publish(tempconsigneConfigTopic, tempconsigneConfigPayload);
 
 // Configuration récupération Payload
-char payloadConfigTopic[] = "homeassistant/sensor/frisquet_payload/config";
+char payloadConfigTopic[] = "homeassistant/sensor/frisquet/payload/config";
 char payloadConfigPayload[] = R"(
 {
   "name": "Frisquet - Payload",
-  "state_topic": "homeassistant/sensor/frisquet_payload/state"
+  "state_topic": "homeassistant/sensor/frisquet/payload/state",
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
 client.publish(payloadConfigTopic, payloadConfigPayload);
 
 // FA: Configuration du capteur CDC
-char tempCDCConfigTopic[] = "homeassistant/sensor/frisquet_CDC/config";
+char tempCDCConfigTopic[] = "homeassistant/sensor/frisquet/CDC/config";
 char tempCDCConfigPayload[] = R"(
 {
+  "uniq_id": "frisquet_tempCDC",
   "name": "Frisquet - Temperature CDC",
-  "state_topic": "homeassistant/sensor/frisquet_CDC/state",
+  "state_topic": "homeassistant/sensor/frisquet/CDC/state",
   "unit_of_measurement": "°C",
-  "device_class": "temperature"
+  "device_class": "temperature",
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
 client.publish(tempCDCConfigTopic, tempCDCConfigPayload);
 
 // FA: Configuration du capteur ECS
-char tempECSConfigTopic[] = "homeassistant/sensor/frisquet_ECS/config";
+char tempECSConfigTopic[] = "homeassistant/sensor/frisquet/ECS/config";
 char tempECSConfigPayload[] = R"(
 {
+  "uniq_id": "frisquet_tempECS",
   "name": "Frisquet - Temperature ECS",
-  "state_topic": "homeassistant/sensor/frisquet_ECS/state",
+  "state_topic": "homeassistant/sensor/frisquet/ECS/state",
   "unit_of_measurement": "°C",
-  "device_class": "temperature"
+  "device_class": "temperature",
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
 client.publish(tempECSConfigTopic, tempECSConfigPayload);
 
 // FA: Configuration du capteur Depart
-char tempDepartConfigTopic[] = "homeassistant/sensor/frisquet_Depart/config";
+char tempDepartConfigTopic[] = "homeassistant/sensor/frisquet/Depart/config";
 char tempDepartConfigPayload[] = R"(
 {
+  "uniq_id": "frisquet_tempDepart",
   "name": "Frisquet - Temperature Depart",
-  "state_topic": "homeassistant/sensor/frisquet_Depart/state",
+  "state_topic": "homeassistant/sensor/frisquet/Depart/state",
   "unit_of_measurement": "°C",
-  "device_class": "temperature"
+  "device_class": "temperature",
+  "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
 }
 )";
 client.publish(tempDepartConfigTopic, tempDepartConfigPayload);
@@ -186,12 +199,12 @@ void loop() {
     connectToMqtt();
   }
   ArduinoOTA.handle();
-  connectToTopic();
 
   char message[255];
   
   // FA: Demande toutes les 500 écoutes
   if (b == 100) { // délais avant rappel à mettre en variable
+    connectToTopic();
     requestBoiler();
     b = 0;
   }
@@ -202,13 +215,14 @@ void loop() {
   int state = radio.receive(byteArr, 0);
   
   if (state == RADIOLIB_ERR_NONE) {
+    connectToTopic(); // 
     int len = radio.getPacketLength();
     Serial.printf("RECEIVED [%2d] : ", len);
     message[0] = '\0';
     for (int i = 0; i < len; i++) {
       sprintf(message + strlen(message), "%02X ", byteArr[i]);
       Serial.printf("%02X ", byteArr[i]);}
-      if (!client.publish("homeassistant/sensor/frisquet_payload/state", message)) {
+      if (!client.publish("homeassistant/sensor/frisquet/payload/state", message)) {
         Serial.println("Failed to publish Payload to MQTT");
     }
     Serial.println("");
@@ -223,7 +237,7 @@ void loop() {
       Serial.printf("Temperature ECS : ");
 
       // Publish temperature to the "frisquet_ECS" MQTT topic
-      publishToMQTT("homeassistant/sensor/frisquet_ECS/state", ECSValue);
+      publishToMQTT("homeassistant/sensor/frisquet/ECS/state", ECSValue);
           
       // Extract bytes 10 and 11 - CDC
       int decimalValueCDC = byteArr[9] << 8 | byteArr[10];
@@ -231,7 +245,7 @@ void loop() {
       Serial.printf("Temperature CDC : ");
      
       // Publish temperature to the "frisquet_CDC" MQTT topic
-      publishToMQTT("homeassistant/sensor/frisquet_CDC/state", CDCValue);
+      publishToMQTT("homeassistant/sensor/frisquet/CDC/state", CDCValue);
       
       // Extract bytes 12 and 13
       int decimalValueDepart = byteArr[11] << 8 | byteArr[12];
@@ -239,7 +253,7 @@ void loop() {
       Serial.printf("Temperature Depart : ");
 
       // Publish temperature to the "frisquet_Depart" MQTT topic
-      publishToMQTT("homeassistant/sensor/frisquet_Depart/state", DepartValue);
+      publishToMQTT("homeassistant/sensor/frisquet/Depart/state", DepartValue);
       
     }
 
@@ -255,29 +269,20 @@ void loop() {
 
       // Extract bytes 16 and 17
       int decimalValueTemp = byteArr[15] << 8 | byteArr[16];
-      float temperatureValue = decimalValueTemp / 10.0;
-      Serial.printf("Temperature : "); Serial.println(temperatureValue);
+      float tempAmbiante1Value = decimalValueTemp / 10.0;
+      Serial.printf("Temperature : ");
+
+      // Publish temperature to the "frisquet/temperature" MQTT topic
+      publishToMQTT("homeassistant/sensor/frisquet/tempAmbiante1/state", tempAmbiante1Value);
 
       // Extract bytes 18 and 19
       int decimalValueCons = byteArr[17] << 8 | byteArr[18];
       float temperatureconsValue = decimalValueCons / 10.0;
-      Serial.printf("Temperature consigne : "); Serial.println(temperatureconsValue);
+      Serial.printf("Temperature consigne : ");
 
-      // Publish temperature to the "frisquet_temperature" MQTT topic
-      char temperatureTopic[] = "homeassistant/sensor/frisquet_temperature/state";
-      char temperaturePayload[10];
-      snprintf(temperaturePayload, sizeof(temperaturePayload), "%.2f", temperatureValue);
-      if (!client.publish(temperatureTopic, temperaturePayload)) {
-        Serial.println("Failed to publish temperature to MQTT");
-      }
-      
-      // Publish temperature to the "tempconsigne" MQTT topic
-      char tempconsigneTopic[] = "homeassistant/sensor/frisquet_consigne/state";
-      char tempconsignePayload[10];
-      snprintf(tempconsignePayload, sizeof(tempconsignePayload), "%.2f", temperatureconsValue);
-      if (!client.publish(tempconsigneTopic, tempconsignePayload)) {
-        Serial.println("Failed to publish consigne to MQTT");
-      }
+      // Publish temperature to the "frisquet/consigne" MQTT topic
+      publishToMQTT("homeassistant/sensor/frisquet/consigne/state", temperatureconsValue);
+
     }
    }
   client.loop();
