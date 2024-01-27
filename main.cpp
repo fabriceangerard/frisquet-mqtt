@@ -26,6 +26,20 @@ byte toDestID;       // 04 - 08 (satellite) ou 7E (connect)
 // -- Première initialisation de la chaîne de requête a la chaudière
 uint8_t BoilerTx[] = {toID, fromID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
 
+
+/*
+toID = 0x80;     // 01 - 80 (boiler)
+fromID = 0x20;   // 02 - 08 (satellite) ou 7E (connect) ou 20 (SondeEx)
+reqID = 0xB7;    // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 
+msgNum = 0x05;   // 04 - 96 !! Potentiellement à modifier à chaque transmission (incrémetation à mettre en place)
+DemRep = 0x01;   // 05 - 01 Demande ou 81 Réponse
+reqMsg[] = {0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
+*/
+
+byte TempEx = 0x64;
+
+uint8_t TempExTx[] = { 0x80, 0x20, 0xB7, 0x10, 0x01, 0x17, 0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02, 00, TempEx};
+
 // Déclaration des variables de valeurs des capteurs 
 float DepartValue;
 float CDCValue;
@@ -121,11 +135,8 @@ void publishDeviceEntities()
   client.setServer(mqttServer, mqttPort);
   client.setBufferSize(2048);
   
-  client.subscribe("homeassistant/select/frisquet/mode/set");
-  client.subscribe("homeassistant/sensor/frisquet/tempAmbiante/state");
-  client.subscribe("homeassistant/sensor/frisquet/tempExterieure/state");
   client.subscribe("homeassistant/sensor/wen_shi_du_chuan_gan_qi_wifi_2_temperature/state");
-
+  
   // Configuration du capteur de température ambiante 1
   char tempAmbiante1ConfigTopic[] = "homeassistant/sensor/frisquet/tempAmbiante1/config";
   char tempAmbiante1ConfigPayload[] = R"(
@@ -199,12 +210,24 @@ void publishDeviceEntities()
     "uniq_id": "frisquet_tempDepart",
     "name": "Frisquet - Temperature Depart",
     "state_topic": "homeassistant/sensor/frisquet/Depart/state",
-    "unit_of_measurement": "°C",
-    "device_class": "temperature",
+    "unit_of_measurement": "°C", "device_class": "temperature",
     "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
   }
   )";
   client.publish(tempDepartConfigTopic, tempDepartConfigPayload);
+
+  // FA: Configuration du capteur TempExterieure
+  char tempExterieureConfigTopic[] = "homeassistant/sensor/frisquet/Exterieure/config";
+  char tempExterieureConfigPayload[] = R"(
+  {
+    "uniq_id": "frisquet_tempExterieure",
+    "name": "Frisquet - Temperature Exterieure",
+    "state_topic": "homeassistant/sensor/frisquet/Exterieure/state",
+    "unit_of_measurement": "°C", "device_class": "temperature",
+    "device":{"ids":["FrisquetBoiler"],"mf":"Frisquet","name":"Frisquet Boiler","mdl":"Frisquet Boiler"}
+  }
+  )";
+  client.publish(tempExterieureConfigTopic, tempExterieureConfigPayload);
 
   // FA: Configuration du capteur Mode
   char modeConfigTopic[] = "homeassistant/sensor/frisquet/mode/config";
@@ -230,16 +253,41 @@ void requestBoiler()
   msgNum=msgNum+0x01;
   BoilerTx[3]=msgNum;
 
-  int stateTx = radio.transmit(BoilerTx, 10);
-  int len10 = 10;
-    Serial.printf("SENT [%2d];", len10);
+  int lenTemp = 10;
+  int stateTx = radio.transmit(BoilerTx, lenTemp);
+  
+    Serial.printf("SENT [%2d];", lenTemp);
     Serial.print(DateTimeRes);
 
     message[0] = '\0';
-    for (int ct = 0; ct < len10; ct++) 
+    for (int ct = 0; ct < lenTemp; ct++) 
     {
       sprintf(message + strlen(message), "%02X ", BoilerTx[ct]);
       Serial.printf(";%02X", BoilerTx[ct]);
+    }
+    Serial.println("");
+}
+
+void sendTempEx()
+{
+  // Serial.println("-- Appel Request Boiler ");
+  DateTime();
+
+  msgNum=msgNum+0x01;
+  TempExTx[3]=msgNum;
+  TempExTx[16]=byte(ExtValue);
+  
+  int lenTemp = 17;
+  int stateTx = radio.transmit(TempExTx, lenTemp);
+
+    Serial.printf("SENT [%2d];", lenTemp);
+    Serial.print(DateTimeRes);
+
+    message[0] = '\0';
+    for (int ct = 0; ct < lenTemp; ct++) 
+    {
+      sprintf(message + strlen(message), "%02X ", TempExTx[ct]);
+      Serial.printf(";%02X", TempExTx[ct]);
     }
     Serial.println("");
 }
@@ -266,19 +314,11 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Vérifier le topic et mettre à jour les variables globales
   if (strcmp(topic, "homeassistant/sensor/wen_shi_du_chuan_gan_qi_wifi_2_temperature/state") == 0)
   {
-    if (tempAmbiante != String(message))
-    {
-      tempAmbiante = String(message);
-      Serial.println(tempAmbiante);
-      tempAmbianteChanged = true;
-    }
-  }
-  else if (strcmp(topic, "homeassistant/sensor/frisquet/tempExterieure/state") == 0)
-  {
     if (tempExterieure != String(message))
     {
       tempExterieure = String(message);
       tempExterieureChanged = true;
+      ExtValue = tempExterieure.toFloat()*10;
     }
   }
   else if (strcmp(topic, "homeassistant/sensor/frisquet/tempConsigne/state") == 0)
@@ -361,13 +401,14 @@ void loop() {
   if (!client.connected()) 
   {
     connectToMqtt();
+    publishDeviceEntities();
     requestBoiler();
+    sendTempEx();
   }
   
   // initialise un msgNum aléatoire
   if (msgNum==1)
   {
-    Serial.printf ("%2d", millis());
     randomSeed(long(temps.getSeconds()));
     msgNum=(random(1,90),HEX);
     // Serial.println(msgNum);
@@ -376,10 +417,15 @@ void loop() {
   temps.update();
   ArduinoOTA.handle();
 
-  // FA: Demande toutes les ReqBoilerDelay millisecondes
+  // FA: Demande toutes les ReqBoilerDelay millisecondesMode réduit
+  
    if (DeltaTime >= ReqBoilerDelay)
     {
+    client.setServer(mqttServer, mqttPort);
+    client.setCallback(callback);
+    publishDeviceEntities();
     requestBoiler();
+    sendTempEx();
     RefTime=millis();
     }
   DeltaTime = millis()-RefTime;
@@ -447,9 +493,11 @@ void loop() {
       Cons1Value = decimalValue / 10.0;
       publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Cons1Value);
 
-       // Extract bytes 58 and 59 - Externe
-      decimalValue = byteArr[57] << 8 | byteArr[58];
+      
+      // Extract bytes 58 and 59 - Externe
+      decimalValue = byteArr[61] << 8 | byteArr[62];
       ExtValue = decimalValue / 10.0;
+      publishToMQTT("homeassistant/sensor/frisquet/Exterieure/state", Cons1Value);
 
     AfficheHeltec();
     }
