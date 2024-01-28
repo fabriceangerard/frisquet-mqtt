@@ -37,7 +37,6 @@ reqMsg[] = {0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02}; // 07-10 - Ch
 */
 
 byte TempEx = 0x64;
-
 uint8_t TempExTx[] = { 0x80, 0x20, 0xB7, 0x10, 0x01, 0x17, 0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02, 00, TempEx};
 
 // Déclaration des variables de valeurs des capteurs 
@@ -47,6 +46,7 @@ float ECSValue;
 float tempAmbiante1Value;
 float temperatureconsValue;
 float ExtValue;
+float ExtValueHA;
 float Ambi1Value;
 float Cons1Value;
 float ModeValue;
@@ -60,8 +60,8 @@ String byteArrayToHexString(uint8_t *byteArray, int length);
 String DateTimeRes;
 
 unsigned long RefTime;
-unsigned long ReqBoilerDelay = 600000;// requête à la chaudière toutes les 10mn
-unsigned long DeltaTime = 600000;
+unsigned long ReqBoilerDelay = 60000;// requête à la chaudière toutes les 10mn
+unsigned long DeltaTime = 60000;
 
 char message[255];
 
@@ -92,21 +92,16 @@ void DateTime()
   int currentMonth = ptm->tm_mon+1;
   int currentYear = ptm->tm_year+1900;
   char buffer[15];
+
   String resfinal;
    
-  sprintf(buffer, "%04d", currentYear);
-    resfinal = String(buffer);
-  sprintf(buffer, "%02d", currentMonth); 
-    resfinal = resfinal + String(buffer);
-  sprintf(buffer, "%02d", monthDay); 
-    resfinal = resfinal + String(buffer) + "-";
+  sprintf(buffer, "%04d", currentYear); resfinal = String(buffer);
+  sprintf(buffer, "%02d", currentMonth); resfinal = resfinal + String(buffer);
+  sprintf(buffer, "%02d", monthDay); resfinal = resfinal + String(buffer) + "-";
 
-  sprintf(buffer, "%02d", temps.getHours()); 
-    resfinal = resfinal + String(buffer);
-  sprintf(buffer, "%02d", temps.getMinutes()); 
-    resfinal = resfinal + String(buffer);
-  sprintf(buffer, "%02d", temps.getSeconds()); 
-    resfinal = resfinal + String(buffer);
+  sprintf(buffer, "%02d", temps.getHours()); resfinal = resfinal + String(buffer);
+  sprintf(buffer, "%02d", temps.getMinutes()); resfinal = resfinal + String(buffer);
+  sprintf(buffer, "%02d", temps.getSeconds()); resfinal = resfinal + String(buffer);
 
   DateTimeRes=resfinal;
 }
@@ -266,6 +261,7 @@ void requestBoiler()
       Serial.printf(";%02X", BoilerTx[ct]);
     }
     Serial.println("");
+    client.publish("homeassistant/sensor/frisquet/payload/state", message);
 }
 
 void sendTempEx()
@@ -275,7 +271,7 @@ void sendTempEx()
 
   msgNum=msgNum+0x01;
   TempExTx[3]=msgNum;
-  TempExTx[16]=byte(ExtValue);
+  TempExTx[16]=byte(ExtValueHA);
   
   int lenTemp = 17;
   int stateTx = radio.transmit(TempExTx, lenTemp);
@@ -290,6 +286,8 @@ void sendTempEx()
       Serial.printf(";%02X", TempExTx[ct]);
     }
     Serial.println("");
+    client.publish("homeassistant/sensor/frisquet/payload/state", message);
+    
 }
 
 // FA: Fonction Publish to MQTT
@@ -318,7 +316,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     {
       tempExterieure = String(message);
       tempExterieureChanged = true;
-      ExtValue = tempExterieure.toFloat()*10;
+      ExtValueHA = tempExterieure.toFloat()*10;
     }
   }
   else if (strcmp(topic, "homeassistant/sensor/frisquet/tempConsigne/state") == 0)
@@ -345,8 +343,8 @@ void AfficheHeltec()
 {
   Heltec.display->clear();
   Heltec.display->drawString(0, 0, "Sat1: "  + String(Ambi1Value,1 ) + "°C / "+ String(Cons1Value,1) + "°C");
-  Heltec.display->drawString(0, 12, "CDC/ECS : " + String(CDCValue, 1) + " / "  + String(ECSValue,1) + "°C");
-  Heltec.display->drawString(0, 24, "Temperature Rad: " + String(DepartValue,1) + "°C");
+  Heltec.display->drawString(0, 12, "CDC/ECS: " + String(CDCValue, 1) + " / "  + String(ECSValue,1) + "°C");
+  Heltec.display->drawString(0, 24, "Rad/Ext: " + String(DepartValue,1) + " / " + String((ExtValueHA/10),1) + "°C");
   Heltec.display->drawString(0, 40, "MAJ: " + DateTimeRes);
   Heltec.display->display();
 }
@@ -411,7 +409,7 @@ void loop() {
   {
     randomSeed(long(temps.getSeconds()));
     msgNum=(random(1,90),HEX);
-    // Serial.println(msgNum);
+    Serial.println(msgNum);
   }
 
   temps.update();
@@ -447,7 +445,7 @@ void loop() {
     message[0] = '\0';
     for (int i = 0; i < len; i++) 
     {
-      sprintf(message + strlen(message), "%02X", byteArr[i]);
+      sprintf(message + strlen(message), "%02X ", byteArr[i]);
       Serial.printf(";%02X", byteArr[i]);
     }
       if (!client.publish("homeassistant/sensor/frisquet/payload/state", message)) 
@@ -486,7 +484,7 @@ void loop() {
       // Extract bytes 44 and 45 - Consigne 1
       decimalValue = byteArr[43] << 8 | byteArr[44];
       Ambi1Value = decimalValue / 10.0;
-      publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Cons1Value);
+      publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Ambi1Value);
       
       // Extract bytes 56 and 57 - Consigne 1
       decimalValue = byteArr[55] << 8 | byteArr[56];
@@ -497,7 +495,7 @@ void loop() {
       // Extract bytes 58 and 59 - Externe
       decimalValue = byteArr[61] << 8 | byteArr[62];
       ExtValue = decimalValue / 10.0;
-      publishToMQTT("homeassistant/sensor/frisquet/Exterieure/state", Cons1Value);
+      publishToMQTT("homeassistant/sensor/frisquet/Exterieure/state", ExtValue);
 
     AfficheHeltec();
     }
@@ -508,7 +506,7 @@ void loop() {
     }
 
       
-    if (len == 23)// Check if the length is 23 bytes
+    if ((len == 23) and (toID==0x08)) // Check if the length is 23 bytes
     {
       // Serial.println("- Trame 23 reçue");
 
