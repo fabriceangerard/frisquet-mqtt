@@ -23,20 +23,11 @@ byte reqMsg[] = {0x79, 0xE0, 0x00, 0x1C}; // 07-10 - Chaîne de demande de temp�
 
 byte toDestID;       // 04 - 08 (satellite) ou 7E (connect)
 
-// -- Première initialisation de la chaîne de requête a la chaudière
+// -- Initialisation de la chaîne de requête a la chaudière
 uint8_t BoilerTx[] = {toID, fromID, reqID, msgNum, DemRep, 0x03, reqMsg[0], reqMsg[1], reqMsg[2], reqMsg[3]};
 
-
-/*
-toID = 0x80;     // 01 - 80 (boiler)
-fromID = 0x20;   // 02 - 08 (satellite) ou 7E (connect) ou 20 (SondeEx)
-reqID = 0xB7;    // 03 - CA !! A modifier pour chaque chaudière / périphérique - à récupérer dans une trame 23 ou 49 
-msgNum = 0x05;   // 04 - 96 !! Potentiellement à modifier à chaque transmission (incrémetation à mettre en place)
-DemRep = 0x01;   // 05 - 01 Demande ou 81 Réponse
-reqMsg[] = {0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02}; // 07-10 - Chaîne de demande de températures chandière [0x79, 0xe0, 0x00, 0x1c]
-*/
-
 byte TempEx = 0x64;
+// -- Initialisation de la chaîne d'envoi de la température exterieure
 uint8_t TempExTx[] = { 0x80, 0x20, 0xB7, 0x10, 0x01, 0x17, 0x9c, 0x54, 0x00, 0x04, 0xa0, 0x29, 0x00, 0x01, 0x02, 00, TempEx};
 
 // Déclaration des variables de valeurs des capteurs 
@@ -46,7 +37,7 @@ float ECSValue;
 float tempAmbiante1Value;
 float temperatureconsValue;
 float ExtValue;
-float ExtValueHA;
+float ExtValueHA; // Température extérieure de HA
 float Ambi1Value;
 float Cons1Value;
 float ModeValue;
@@ -106,6 +97,8 @@ void DateTime()
   DateTimeRes=resfinal;
 }
 
+// Parametrage et Connexion au broker MQTT
+//
 void connectToMqtt() 
 {
   while (!client.connected()) {
@@ -124,12 +117,16 @@ void connectToMqtt()
   }
 }
 
+// Création et publication des périphériques / capteurs 
+// Abonnement aux capteurs existants
+//
 void publishDeviceEntities()
 {
   // Initialisation de la connexion MQTT
   client.setServer(mqttServer, mqttPort);
   client.setBufferSize(2048);
   
+  // Abonnement au capteur de température extérieure
   client.subscribe("homeassistant/sensor/wen_shi_du_chuan_gan_qi_wifi_2_temperature/state");
   
   // Configuration du capteur de température ambiante 1
@@ -239,15 +236,17 @@ void publishDeviceEntities()
   client.publish(modeConfigTopic, modeConfigPayload);
 }
 
-// FA: Requête de demande de températures à la chaudière sur la base de BoilerTx[]
+// Requête de demande de températures à la chaudière sur la base de BoilerTx[]
+//
 void requestBoiler()
 {
-  // Serial.println("-- Appel Request Boiler ");
+  // Récupération de la date/heure
   DateTime();
 
-  msgNum=msgNum+0x01;
+  msgNum = msgNum + 0x01;
   BoilerTx[3]=msgNum;
 
+  // Taille de la trame
   int lenTemp = 10;
   int stateTx = radio.transmit(BoilerTx, lenTemp);
   
@@ -266,13 +265,14 @@ void requestBoiler()
 
 void sendTempEx()
 {
-  // Serial.println("-- Appel Request Boiler ");
+  // Récupération de la date/heure
   DateTime();
 
-  msgNum=msgNum+0x01;
+  msgNum = msgNum + 0x01;
   TempExTx[3]=msgNum;
   TempExTx[16]=byte(ExtValueHA);
   
+  // Taille de la trame
   int lenTemp = 17;
   int stateTx = radio.transmit(TempExTx, lenTemp);
 
@@ -287,7 +287,6 @@ void sendTempEx()
     }
     Serial.println("");
     client.publish("homeassistant/sensor/frisquet/payload/state", message);
-    
 }
 
 // FA: Fonction Publish to MQTT
@@ -301,6 +300,8 @@ void publishToMQTT(char* MQTT_Topic, float MQTT_Value)
   }    
 }
 
+// Récupération de données du broker MQTT
+//
 void callback(char *topic, byte *payload, unsigned int length)
 {
   // Convertir le payload en une chaîne de caractères
@@ -338,7 +339,8 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 }
 
-// Affichage sur l'écran Heltec
+// Affichage des informations sur l'écran Heltec
+//
 void AfficheHeltec()
 {
   Heltec.display->clear();
@@ -348,9 +350,11 @@ void AfficheHeltec()
   Heltec.display->drawString(0, 40, "MAJ: " + DateTimeRes);
   Heltec.display->display();
 }
+
+// Setup
+//
 void setup() 
 {
- 
   // Initialize Wifi connection
   Serial.begin(115200);
   Serial.println("Booting");
@@ -381,6 +385,10 @@ void setup()
   state = radio.setPreambleLength(4);
   state = radio.setSyncWord(network_id, sizeof(network_id));
 
+  randomSeed(long(millis()));
+  msgNum=(random(1,90));
+
+  Serial.print("MsgNum "); Serial.println(msgNum);
   initOTA();
 
   Serial.println("Ready");
@@ -394,7 +402,8 @@ void setup()
   publishDeviceEntities();
 }
 
-// FA: Programme princpal
+// Programme princpal
+//
 void loop() {
   if (!client.connected()) 
   {
@@ -405,21 +414,20 @@ void loop() {
   }
   
   // initialise un msgNum aléatoire
-  if (msgNum==1)
-  {
-    randomSeed(long(temps.getSeconds()));
-    msgNum=(random(1,90),HEX);
-    Serial.println(msgNum);
-  }
+  // if (msgNum==1)
+  //{
+    //randomSeed(long(temps.getSeconds()));
+    
+  //}
 
   temps.update();
   ArduinoOTA.handle();
 
-  // FA: Demande toutes les ReqBoilerDelay millisecondesMode réduit
+  // FA: Demande toutes les Delay millisecondesMode réduit
   
    if (DeltaTime >= ReqBoilerDelay)
     {
-    client.setServer(mqttServer, mqttPort);
+    // client.setServer(mqttServer, mqttPort);
     client.setCallback(callback);
     publishDeviceEntities();
     requestBoiler();
@@ -458,9 +466,6 @@ void loop() {
     toID=byteArr[0];
     toDestID=byteArr[4];
 
-    // Serial.printf("> ");
-    // Serial.printf("%02X ",toID); 
-
     // FA: Décodage chaîne de réponse suite à demande de températures
     if ((len == 63) and (toID==0x08) and (toDestID==0x81))
     {
@@ -484,15 +489,14 @@ void loop() {
       // Extract bytes 44 and 45 - Consigne 1
       decimalValue = byteArr[43] << 8 | byteArr[44];
       Ambi1Value = decimalValue / 10.0;
-      publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Ambi1Value);
+      publishToMQTT("homeassistant/sensor/frisquet/tempAmbiante1/state", Ambi1Value);
       
       // Extract bytes 56 and 57 - Consigne 1
       decimalValue = byteArr[55] << 8 | byteArr[56];
       Cons1Value = decimalValue / 10.0;
       publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Cons1Value);
 
-      
-      // Extract bytes 58 and 59 - Externe
+      // Extract bytes 62 and 63 - Exterieure
       decimalValue = byteArr[61] << 8 | byteArr[62];
       ExtValue = decimalValue / 10.0;
       publishToMQTT("homeassistant/sensor/frisquet/Exterieure/state", ExtValue);
@@ -500,11 +504,30 @@ void loop() {
     AfficheHeltec();
     }
 
-    if (len == 49)
+    if ((len == 49) and (toID==0x08))
     {
-      // Serial.println("Trame satellite reçue");
-    }
+      // Extract bytes 08 and 09 - Exterieure
+      decimalValue = byteArr[7] << 8 | byteArr[8];
+      ExtValue = decimalValue / 10.0;
+      publishToMQTT("homeassistant/sensor/frisquet/Exterieure/state", ExtValue);
 
+      // Extract bytes 20 and 21
+      int decimalValueTemp = byteArr[19] << 8 | byteArr[20];
+      Ambi1Value = decimalValueTemp / 10.0;
+      publishToMQTT("homeassistant/sensor/frisquet/tempAmbiante1/state", Ambi1Value);
+
+      // Extract bytes 22 and 23
+      int decimalValueCons = byteArr[21] << 8 | byteArr[22];
+      Cons1Value = decimalValueCons / 10.0;
+      publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Cons1Value);
+
+      // Extract bytes 25
+      int decimalValueMode = byteArr[24];
+      ModeValue = decimalValueMode;
+      publishToMQTT("homeassistant/sensor/frisquet/mode/state", ModeValue);
+            
+      AfficheHeltec();
+    }
       
     if ((len == 23) and (toID==0x08)) // Check if the length is 23 bytes
     {
@@ -520,7 +543,7 @@ void loop() {
       Cons1Value = decimalValueCons / 10.0;
       publishToMQTT("homeassistant/sensor/frisquet/consigne/state", Cons1Value);
 
-      // Extract bytes 21
+      // Extract bytes 20 21
       int decimalValueMode = byteArr[20];
       ModeValue = decimalValueMode;
       publishToMQTT("homeassistant/sensor/frisquet/mode/state", ModeValue);
